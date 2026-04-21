@@ -3,7 +3,7 @@ name: Back4App Auto Redeploy
 # Runs every 5 minutes (best-effort) and on manual trigger
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 permissions:
