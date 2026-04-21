@@ -16,7 +16,6 @@ Go to your repo **Settings > Secrets and variables > Actions** and add:
 | `GH_PASSWORD` | Yes | Your GitHub password |
 | `GH_2FA_SECRET` | No | Your GitHub TOTP 2FA secret (base32 string) for auto 2FA |
 | `BACK4APP_URL` | Yes | Your Back4App container page URL. Must be the full URL pointing to the specific container, e.g. `https://containers.back4app.com/apps/xxxx-xxx-xxxxx` |
-| `PAT_TOKEN` | Yes | GitHub Personal Access Token (classic). Required scopes: `repo`. Used by `gh` CLI to read/write the cooldown variable |
 
 ### 3. Run
 

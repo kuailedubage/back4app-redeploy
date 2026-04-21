@@ -15,12 +15,21 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Restore cooldown cache
+        id: cooldown-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cooldown
+          key: cooldown-
+          restore-keys: cooldown-
+
       - name: Check cooldown
         id: cooldown
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          LAST=$(gh variable get LAST_REDEPLOY --repo ${{ github.repository }} 2>/dev/null || echo "0")
+          LAST=0
+          if [ -f .cooldown/timestamp ]; then
+            LAST=$(cat .cooldown/timestamp)
+          fi
           NOW=$(date +%s)
           DIFF=$((NOW - LAST))
           echo "Last redeploy: ${DIFF}s ago"
@@ -73,11 +82,17 @@ jobs:
 
       - name: Set cooldown on redeploy
         if: steps.cooldown.outputs.skip != 'true' && steps.run.outputs.redeployed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          gh variable set LAST_REDEPLOY --body "$(date +%s)" --repo ${{ github.repository }}
+          mkdir -p .cooldown
+          date +%s > .cooldown/timestamp
           echo "Cooldown set for 1 hour."
+
+      - name: Save cooldown cache
+        if: steps.cooldown.outputs.skip != 'true' && steps.run.outputs.redeployed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .cooldown
+          key: cooldown-${{ github.run_id }}
 
       - name: Upload screenshots
         if: always() && steps.cooldown.outputs.skip != 'true'
