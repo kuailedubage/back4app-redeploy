@@ -8,7 +8,6 @@ on:
 permissions:
   actions: write
   contents: read
-  variables: write
 
 jobs:
   auto-redeploy:
@@ -19,7 +18,7 @@ jobs:
       - name: Check cooldown
         id: cooldown
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           LAST=$(gh variable get LAST_REDEPLOY --repo ${{ github.repository }} 2>/dev/null || echo "0")
           NOW=$(date +%s)
@@ -75,7 +74,7 @@ jobs:
       - name: Set cooldown on redeploy
         if: steps.cooldown.outputs.skip != 'true' && steps.run.outputs.redeployed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           gh variable set LAST_REDEPLOY --body "$(date +%s)" --repo ${{ github.repository }}
           echo "Cooldown set for 1 hour."
