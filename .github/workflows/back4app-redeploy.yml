@@ -1,0 +1,78 @@
+name: Back4App Auto Redeploy
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  variables: write
+
+jobs:
+  auto-redeploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check cooldown
+        id: cooldown
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LAST=$(gh variable get LAST_REDEPLOY --repo ${{ github.repository }} 2>/dev/null || echo "0")
+          NOW=$(date +%s)
+          DIFF=$((NOW - LAST))
+          echo "Last redeploy: ${DIFF}s ago"
+          if [ "$DIFF" -lt 3600 ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Cooldown active (${DIFF}s < 3600s), skipping."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Cooldown expired, proceeding."
+          fi
+
+      - name: Checkout repository
+        if: steps.cooldown.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        if: steps.cooldown.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        if: steps.cooldown.outputs.skip != 'true'
+        run: |
+          pip install playwright pyotp
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run auto redeploy
+        id: run
+        if: steps.cooldown.outputs.skip != 'true'
+        env:
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GH_PASSWORD: ${{ secrets.GH_PASSWORD }}
+          GH_2FA_SECRET: ${{ secrets.GH_2FA_SECRET }}
+          BACK4APP_URL: ${{ secrets.BACK4APP_URL }}
+          GITHUB_OUTPUT_FILE: ${{ github.output }}
+        run: python scripts/auto_redeploy.py
+
+      - name: Set cooldown on redeploy
+        if: steps.cooldown.outputs.skip != 'true' && steps.run.outputs.redeployed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh variable set LAST_REDEPLOY --body "$(date +%s)" --repo ${{ github.repository }}
+          echo "Cooldown set for 1 hour."
+
+      - name: Upload screenshots
+        if: always() && steps.cooldown.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_id }}
+          path: screenshots/
+          retention-days: 3
