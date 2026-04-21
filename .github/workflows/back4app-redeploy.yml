@@ -42,12 +42,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+
+      - name: Cache Playwright browsers
+        if: steps.cooldown.outputs.skip != 'true'
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
 
       - name: Install dependencies
         if: steps.cooldown.outputs.skip != 'true'
         run: |
           pip install playwright pyotp
-          playwright install chromium
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            playwright install chromium
+          fi
           playwright install-deps chromium
 
       - name: Run auto redeploy
