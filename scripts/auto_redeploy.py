@@ -31,12 +31,44 @@ def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+def _redact_sensitive(page):
+    """Mask UUIDs, hex IDs, and email addresses visible on the page before taking a screenshot."""
+    # Extract the app ID from BACK4APP_URL path to use as an extra redaction target
+    app_id = ""
+    try:
+        app_id = urlparse(BACK4APP_URL).path.rstrip("/").rsplit("/", 1)[-1]
+    except Exception:
+        pass
+    page.evaluate("""(appId) => {
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+        const HEX_ID_RE = /[0-9a-f]{24,}/gi;
+        const EMAIL_RE = /[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Z|a-z]{2,}/g;
+        while (walker.nextNode()) {
+            let t = walker.currentNode;
+            let v = t.nodeValue;
+            if (!v) continue;
+            v = v.replace(UUID_RE, '***');
+            v = v.replace(HEX_ID_RE, '***');
+            v = v.replace(EMAIL_RE, '***');
+            if (appId && v.includes(appId)) {
+                v = v.split(appId).join('***');
+            }
+            if (v !== t.nodeValue) t.nodeValue = v;
+        }
+    }""", app_id)
+
+
 def shot(page, label):
     global _step
     _step += 1
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
     name = f"{_step:02d}_{label}"
     path = os.path.join(SCREENSHOT_DIR, f"{name}.png")
+    try:
+        _redact_sensitive(page)
+    except Exception:
+        pass
     page.screenshot(path=path, full_page=True)
     log(f"Screenshot: {name}.png")
 
