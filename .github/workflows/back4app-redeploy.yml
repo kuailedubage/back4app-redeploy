@@ -96,22 +96,9 @@ jobs:
           key: cooldown-${{ github.run_id }}
 
       - name: Upload screenshots
-        id: upload-screenshots
         if: always() && steps.cooldown.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: screenshots-${{ github.run_id }}
           path: screenshots/
           retention-days: 1
-
-      - name: Delete screenshots after 10 minutes
-        if: always() && steps.upload-screenshots.outputs.artifact-id
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "Waiting 10 minutes before deleting artifact..."
-          sleep 600
-          gh api --method DELETE \
-            repos/${{ github.repository }}/actions/artifacts/${{ steps.upload-screenshots.outputs.artifact-id }} \
-            && echo "Artifact deleted." \
-            || echo "Failed to delete artifact (may have already expired)."
