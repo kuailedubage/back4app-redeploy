@@ -42,12 +42,9 @@ def shot(page, label):
 
 
 def safe_url(url):
-    """Strip query parameters and fragment to avoid leaking sensitive IDs in logs."""
+    """Only keep scheme and hostname to avoid leaking IDs in paths or query strings."""
     parsed = urlparse(url)
-    sanitized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-    if parsed.query:
-        sanitized += "?<redacted>"
-    return sanitized
+    return f"{parsed.scheme}://{parsed.netloc}/..."
 
 
 def random_delay(low=0.5, high=1.5):
