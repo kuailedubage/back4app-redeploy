@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import random
+from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 
@@ -38,6 +39,15 @@ def shot(page, label):
     path = os.path.join(SCREENSHOT_DIR, f"{name}.png")
     page.screenshot(path=path, full_page=True)
     log(f"Screenshot: {name}.png")
+
+
+def safe_url(url):
+    """Strip query parameters and fragment to avoid leaking sensitive IDs in logs."""
+    parsed = urlparse(url)
+    sanitized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    if parsed.query:
+        sanitized += "?<redacted>"
+    return sanitized
 
 
 def random_delay(low=0.5, high=1.5):
@@ -131,7 +141,7 @@ def handle_2fa(page):
                 time.sleep(1)
                 cur = page.url
                 if "two-factor" not in cur and "sessions/two-factor" not in cur:
-                    log(f"2FA passed! URL: {cur}")
+                    log(f"2FA passed! URL: {safe_url(cur)}")
                     shot(page, "2fa_passed")
                     return
 
@@ -268,7 +278,7 @@ def main():
         sys.exit(1)
 
     log(f"Starting Back4App auto-redeploy")
-    log(f"Target: {BACK4APP_URL}")
+    log(f"Target: <redacted>")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -296,7 +306,7 @@ def main():
             random_delay(2.0, 3.0)
             shot(page, "initial_page")
             current_url = page.url
-            log(f"URL: {current_url}")
+            log(f"URL: {safe_url(current_url)}")
 
             # Step 2: Login if needed
             if "login" in current_url.lower() or "signin" in current_url.lower() \
@@ -323,12 +333,12 @@ def main():
 
                 random_delay(3.0, 5.0)
                 shot(page, "github_login_page")
-                log(f"URL: {page.url}")
+                log(f"URL: {safe_url(page.url)}")
 
                 if "github.com" in page.url:
                     github_login(page)
                     random_delay(3.0, 5.0)
-                    log(f"URL after login: {page.url}")
+                    log(f"URL after login: {safe_url(page.url)}")
 
                 if "github.com" in page.url:
                     log("WARNING: Still on GitHub, login failed")
@@ -339,7 +349,7 @@ def main():
                     try:
                         page.wait_for_url("**/back4app.com/**", timeout=30000)
                     except PlaywrightTimeout:
-                        log(f"Redirect timeout. URL: {page.url}")
+                        log(f"Redirect timeout. URL: {safe_url(page.url)}")
 
                 random_delay(3.0, 5.0)
                 shot(page, "login_complete")
