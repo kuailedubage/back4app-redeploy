@@ -32,31 +32,48 @@ def log(msg):
 
 
 def _redact_sensitive(page):
-    """Mask UUIDs, hex IDs, and email addresses visible on the page before taking a screenshot."""
-    # Extract the app ID from BACK4APP_URL path to use as an extra redaction target
+    """Mask sensitive info visible on the page before taking a screenshot."""
+    # Collect all values that should be redacted
     app_id = ""
     try:
         app_id = urlparse(BACK4APP_URL).path.rstrip("/").rsplit("/", 1)[-1]
     except Exception:
         pass
-    page.evaluate("""(appId) => {
+    page.evaluate("""({appId, ghUser}) => {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
-        const HEX_ID_RE = /[0-9a-f]{24,}/gi;
+        const HEX_ID_RE = /\\b[0-9a-f]{24,}\\b/gi;
+        const SHA256_RE = /\\b[0-9a-f]{64}\\b/gi;
         const EMAIL_RE = /[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Z|a-z]{2,}/g;
+        const B4A_URL_RE = /[a-z0-9][a-z0-9\\-]*\\.b4a\\.run/gi;
+        const REGISTRY_RE = /registry\\.containers\\.back4app\\.com\\/[^\\s]*/gi;
         while (walker.nextNode()) {
             let t = walker.currentNode;
             let v = t.nodeValue;
             if (!v) continue;
             v = v.replace(UUID_RE, '***');
+            v = v.replace(SHA256_RE, '***');
             v = v.replace(HEX_ID_RE, '***');
             v = v.replace(EMAIL_RE, '***');
+            v = v.replace(B4A_URL_RE, '***');
+            v = v.replace(REGISTRY_RE, 'registry.***/***');
             if (appId && v.includes(appId)) {
                 v = v.split(appId).join('***');
             }
+            if (ghUser && v.includes(ghUser)) {
+                v = v.split(ghUser).join('***');
+            }
             if (v !== t.nodeValue) t.nodeValue = v;
         }
-    }""", app_id)
+        // Also redact href/src attributes that contain sensitive info in <a> tags
+        document.querySelectorAll('a[href]').forEach(a => {
+            let h = a.getAttribute('href');
+            if (h && (h.includes('.b4a.run') || (ghUser && h.includes(ghUser))
+                       || (appId && h.includes(appId)))) {
+                a.setAttribute('href', '#redacted');
+            }
+        });
+    }""", {"appId": app_id, "ghUser": GH_USERNAME})
 
 
 def shot(page, label):
