@@ -96,7 +96,7 @@ jobs:
           key: cooldown-${{ github.run_id }}
 
       - name: Upload screenshots
-        if: always() && steps.cooldown.outputs.skip != 'true'
+        if: failure() && steps.cooldown.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: screenshots-${{ github.run_id }}
